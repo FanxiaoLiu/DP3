@@ -106,6 +106,8 @@ class Button:
         else:
             return False
 
+from gpiozero import LED
+
 from multiprocessing import Process as proc
 from multiprocessing import Value as val
 
@@ -164,9 +166,11 @@ def main():
     try:
         ACTUATOR_ID = 17
         BUTTON_ID = 19
+        LED_ID = 5
         servo = Actuator(ACTUATOR_ID)                     # Creates a new Actuator object with pin number 17
         button_status = val('b',False)           # Creates a new shared boolean variable with an initial value of False
         button_status = val('b',False)
+        led = LED(LED_ID)
         
         # Creates a new process that checks the state of a button and updates the shared variable
         button_job = proc(
@@ -211,8 +215,13 @@ def main():
                     j.start()
             
                 # Waits for each process in the list to finish before continuing
+
+                led.blink()
+
                 for j in jobs:
                     j.join()
+
+                led.off()
             
                 # Terminates each process in the list
                 for j in jobs:
@@ -237,13 +246,15 @@ def main():
                 # Activates the servo motor if the standard average temperature is lower than the injured average temperature
                 if svalue.value < ivalue.value:
                     print("Servo activated")
-                    servo.max()
+                    #servo.max()
                     print("sleep")
+                    led.on()
                     time.sleep(5)
+                    led.off()
                     print("unsleep")
                 else:
                     print("Go next")
-                    servo.min()
+                    #servo.min()
 
             # If the button is not pressed, print a message and wait for 3 seconds before checking the button state again
             while not button_status.value:
