@@ -1,3 +1,7 @@
+# ----------------------------------------------------------------
+# This program uses Classes and Methods since it utilizes multiprocessing to process multiple commands simultaneously. Without categorizing each process into classes and their respective methods, the code would be much more messier to run and understand.
+# Furthermore, classes and methods allows for better organization of code. Since we have several instances where we have to use similar data structures but different data. So we deemed it more approriate to create Classes for those instances. There were also instances where methods were needed for two sets of data with the same data structure so Classes were used for those as well
+
 # Note: The code will have to be run on a Command Line or Terminal on a Raspberry Pi, not IDLE since it does not support the multiprocessing functions.
 
 from sensor_library import *     
@@ -10,13 +14,13 @@ class ListTemp:
     def __init__(self,sensorid) -> None:
         self.templist = []           # Initialize an empty list to store temperatures
         self.rollinglist = []        # Initialize an empty list to store rolling averages
-        self.id = sensorid           # Store the ID of the sensor
+        self.id = sensorid           # Store the ID of the sensor, if ID = 0, Standard Temperature, ID = 1, Injured Temp
         if sensorid == 1:            # If the sensor ID is 1 (injured sensor), create a new Temperature_Sensor object
             self.sensor = Temperature_Sensor()
 
     # Method to get the temperature from the appropriate source based on the sensor ID
     def getSensorTemp(self) -> float:
-        if self.id == 0:            # If the sensor ID is 0 (standard sensor), return a random value between 29.0 and 30.0
+        if self.id == 0:            # If the sensor ID is 0 (standard sensor), return a random value between 29.0 and 30.0. Normally this would be from another sensor, but due to the limitations only allowing one sensor for us, a random number generator was used for the standard temperature.
             return float(random.randint(290,300))/10.0
         elif self.id == 1:          # If the sensor ID is 1 (injured sensor), get the average temperature from the Temperature_Sensor object
             return self.sensor.avg_temp()
@@ -158,14 +162,16 @@ def cont_check_button_hold(gpioid,time_hold,button_state):
 
 def main():
     try:
-        servo = Actuator(17)                     # Creates a new Actuator object with pin number 17
+        ACTUATOR_ID = 17
+        BUTTON_ID = 19
+        servo = Actuator(ACTUATOR_ID)                     # Creates a new Actuator object with pin number 17
         button_status = val('b',False)           # Creates a new shared boolean variable with an initial value of False
         button_status = val('b',False)
         
         # Creates a new process that checks the state of a button and updates the shared variable
         button_job = proc(
                     target = cont_check_button,
-                args=(19,button_status)
+                args=(BUTTON_ID,button_status)
             )
         button_job.start()
         
@@ -183,17 +189,20 @@ def main():
 
                 jobs = []
                 
+                ROLLING_INTERVAL = 2
+                TOTAL_TIME_INTERVAL = 10
+
                 # Creates a new process that initializes a list of standard temperature values
                 process1 = proc(
                         target=standardListInit,
-                    args=(2,10,svalue)
+                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,svalue)
                 )
                 jobs.append(process1)
 
                 # Creates a new process that initializes a list of injured temperature values
                 process2 = proc(
                         target=injuredListInit,
-                    args=(2,10,ivalue)
+                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,ivalue)
                 )
                 jobs.append(process2)
                 
@@ -248,11 +257,14 @@ def main():
 if __name__ == "__main__":
     try:
         button_status_hold = val('b',False)   # Creates a boolean value for button status
+
+        BUTTON_ID = 19
+        TIME_HOLD = 3
         
         # Creates a process to check the button status
         button_job2 = proc(
                     target = cont_check_button_hold,
-                args=(19,3,button_status_hold)
+                args=(BUTTON_ID,TIME_HOLD,button_status_hold)
             )
         
         button_job2.start()                   # Starts the button checking process
