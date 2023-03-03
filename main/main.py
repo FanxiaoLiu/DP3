@@ -246,7 +246,7 @@ def main():
                 # Activates the servo motor if the standard average temperature is lower than the injured average temperature
                 if svalue.value < ivalue.value:
                     print("Servo activated")
-                    #servo.max()
+                    servo.max()
                     print("sleep")
                     led.on()
                     time.sleep(5)
@@ -254,11 +254,12 @@ def main():
                     print("unsleep")
                 else:
                     print("Go next")
-                    #servo.min()
+                    servo.min()
 
             # If the button is not pressed, print a message and wait for 3 seconds before checking the button state again
             while not button_status.value:
                 print("Button off")
+                led.off()
                 time.sleep(3)
 
     # If an exception is caught, exits the program
