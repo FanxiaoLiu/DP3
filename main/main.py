@@ -3,6 +3,7 @@
 # Furthermore, classes and methods allows for better organization of code. Since we have several instances where we have to use similar data structures but different data. So we deemed it more approriate to create Classes for those instances. There were also instances where methods were needed for two sets of data with the same data structure so Classes were used for those as well
 
 # Note: The code will have to be run on a Command Line or Terminal on a Raspberry Pi, not IDLE since it does not support the multiprocessing functions.
+# Note: To reduce jitter, run the restart the Raspberry Pi before running.
 
 from sensor_library import *     
 import time,random              
@@ -178,6 +179,8 @@ def main():
                 args=(BUTTON_ID,button_status)
             )
         button_job.start()
+
+        servo.min()
         
         # An 'infinite' loop is started
         while True:
