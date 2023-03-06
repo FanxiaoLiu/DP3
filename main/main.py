@@ -33,7 +33,7 @@ class ListTemp:
         self.templist.append(self.getSensorTemp())
 
     # Method to calculate rolling averages and store them in the rollinglist
-    def getRollingTemp(self,rolling_interval,total_time):
+    def getRollingTemp(self,rolling_interval,total_time,led_status,button_status,servo_status):
         for x in range(0,total_time):                   # Loop through total_time number of times
             self.addTemp()                              # Add a temperature value to the templist
             try:
@@ -43,7 +43,8 @@ class ListTemp:
                         avg += self.templist[x]
                     avg = avg/len(self.templist)
                     self.rollinglist.append(avg)            # Add the average temperature to the rollinglist
-                    self.print_styled(avg)                  # Print the templist and rolling average in a stylized format
+                    if self.id == 1:
+                        self.print_styled(avg,led_status,button_status,servo_status)                  # Print the templist and rolling average in a stylized format
                     self.templist.pop(0)                     # Remove the oldest temperature value from the templist to maintain the rolling interval
             except ZeroDivisionError:
                 print("Please input a list of temperatures.")    # If an empty list is provided, print an error message and return None
@@ -51,7 +52,7 @@ class ListTemp:
             time.sleep(1)
 
     # Method to print the templist and rolling average in a stylized format
-    def print_styled(self,avg):
+    def print_styled(self,avg,led_status,button_status,servo_status):
         str_id = ""
         if self.id == 0:            # If the sensor ID is 0 (standard sensor), set str_id to "Standard Temperatures"
             str_id = "Standard Temperatures"
@@ -63,7 +64,12 @@ class ListTemp:
             print(round(x,2),end=" ")
         print("]")
         print("Rolling Avg:",round(avg,2))
-        print("----------------------------------")
+        print("----------------------------------------")
+        print("I/O Devices Status")
+        print("LED\t\tButton\t\tActuator")
+        print(led_status + "\t" + button_status + "\t\t" + servo_status)
+        print("----------------------------------------")
+
 
 
 from gpiozero import Servo
@@ -116,9 +122,9 @@ from multiprocessing import Value as val
 standardList = ListTemp(0)
 injuredList = ListTemp(1)
 
-def standardListInit(rolling, total, rolling_avg):
+def standardListInit(rolling, total, rolling_avg,led_status,button_status,servo_status):
     # Initializing rolling temperature list for the standard temperature 
-    standardList.getRollingTemp(rolling,total)
+    standardList.getRollingTemp(rolling,total,led_status,button_status,servo_status)
     standard_avg = 0
     
     # Calculating the rolling average of the standard temperature
@@ -128,9 +134,9 @@ def standardListInit(rolling, total, rolling_avg):
     rolling_avg.value = standard_avg/len(standardList.rollinglist)
 
 
-def injuredListInit(rolling,total,rolling_avg):
+def injuredListInit(rolling,total,rolling_avg,led_status,button_status,servo_status):
     # Initializing rolling temperature list for the injured temperature
-    injuredList.getRollingTemp(rolling,total)
+    injuredList.getRollingTemp(rolling,total,led_status,button_status,servo_status)
     injured_avg = 0
 
     # Calculating the rolling average of the injured temperature
@@ -163,15 +169,25 @@ def cont_check_button_hold(gpioid,time_hold,button_state):
                 break
             time.sleep(1)
 
+def print_styled(led_status,button_status,actuator_status,time_sleep):
+    print("----------------------------------------")
+    print("I/O Devices Status")
+    print("LED\t\tButton\t\tActuator")
+    print(led_status + "\t" + button_status + "\t\t" + actuator_status)
+    print("----------------------------------------")
+
 def main():
     try:
         ACTUATOR_ID = 17
         BUTTON_ID = 19
         LED_ID = 5
+        PRINT_TIME_SLEEP = 2
+        COMPRESSION_TIME = 10
         servo = Actuator(ACTUATOR_ID)                     # Creates a new Actuator object with pin number 17
         button_status = val('b',False)           # Creates a new shared boolean variable with an initial value of False
-        button_status = val('b',False)
         led = LED(LED_ID)
+        servo_status = False
+        LED_Status = "Off\t"
         
         # Creates a new process that checks the state of a button and updates the shared variable
         button_job = proc(
@@ -202,14 +218,14 @@ def main():
                 # Creates a new process that initializes a list of standard temperature values
                 process1 = proc(
                         target=standardListInit,
-                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,svalue)
+                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,svalue,LED_Status,button_status.value,servo_status)
                 )
                 jobs.append(process1)
 
                 # Creates a new process that initializes a list of injured temperature values
                 process2 = proc(
                         target=injuredListInit,
-                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,ivalue)
+                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,ivalue,LED_Status,button_status.value,servo_status)
                 )
                 jobs.append(process2)
                 
@@ -220,19 +236,19 @@ def main():
                 # Waits for each process in the list to finish before continuing
 
                 led.blink()
+                LED_Status = "Blinking"
 
                 for j in jobs:
                     j.join()
 
                 led.off()
+                LED_Status = "Off\t"
             
                 # Terminates each process in the list
                 for j in jobs:
                     j.terminate()
 
                 stop = time.perf_counter()         # Records the end time
-
-                print("Total Time Elapsed: ", stop-start)
 
                 print("Standard Avg Temp:", svalue.value)
                 print("Injured Avg Temp:", ivalue.value)
@@ -250,20 +266,32 @@ def main():
                 if svalue.value < ivalue.value:
                     print("Servo activated")
                     servo.max()
-                    print("sleep")
+                    servo_status = "Compressing"
+                    print("Device Sleeping")
                     led.on()
-                    time.sleep(5)
+                    LED_Status = "On\t"
+                    # Creates new task for constantly printing out the state of the I/O devices
+
+                    for x in range(0,COMPRESSION_TIME,PRINT_TIME_SLEEP):
+                        print_styled(LED_Status,button_status.value,servo_status)
+                        time.sleep(PRINT_TIME_SLEEP)
+
                     led.off()
-                    print("unsleep")
+                    LED_Status = "Off\t"
+                    print("Device Re-activating")
                 else:
                     print("Go next")
                     servo.min()
+                    servo_status = "Not Compressing"
+                    print_styled(LED_Status,button_status.value,servo_status)
+
 
             # If the button is not pressed, print a message and wait for 3 seconds before checking the button state again
             while not button_status.value:
-                print("Button off")
                 led.off()
+                LED_Status = "Off"
                 time.sleep(3)
+                print_styled(LED_Status,button_status.value,servo_status)
 
     # If an exception is caught, exits the program
     except:
