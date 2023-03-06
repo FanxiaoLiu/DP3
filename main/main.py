@@ -67,7 +67,7 @@ class ListTemp:
         print("----------------------------------------")
         print("I/O Devices Status")
         print("LED\t\tButton\t\tActuator")
-        print(led_status + "\t" + button_status + "\t\t" + servo_status)
+        print(led_status, "\t", button_status,"\t\t",servo_status)
         print("----------------------------------------")
 
 
@@ -169,133 +169,130 @@ def cont_check_button_hold(gpioid,time_hold,button_state):
                 break
             time.sleep(1)
 
-def print_styled(led_status,button_status,actuator_status,time_sleep):
+def print_styled(led_status,button_status,actuator_status):
     print("----------------------------------------")
     print("I/O Devices Status")
     print("LED\t\tButton\t\tActuator")
-    print(led_status + "\t" + button_status + "\t\t" + actuator_status)
+    print(led_status,"\t",button_status,"\t\t", actuator_status)
     print("----------------------------------------")
 
 def main():
-    try:
-        ACTUATOR_ID = 17
-        BUTTON_ID = 19
-        LED_ID = 5
-        PRINT_TIME_SLEEP = 2
-        COMPRESSION_TIME = 10
-        servo = Actuator(ACTUATOR_ID)                     # Creates a new Actuator object with pin number 17
-        button_status = val('b',False)           # Creates a new shared boolean variable with an initial value of False
-        led = LED(LED_ID)
-        servo_status = False
-        LED_Status = "Off\t"
-        
-        # Creates a new process that checks the state of a button and updates the shared variable
-        button_job = proc(
-                    target = cont_check_button,
-                args=(BUTTON_ID,button_status)
-            )
-        button_job.start()
+    ACTUATOR_ID = 17
+    BUTTON_ID = 19
+    LED_ID = 5
+    PRINT_TIME_SLEEP = 2
+    COMPRESSION_TIME = 10
+    servo = Actuator(ACTUATOR_ID)                     # Creates a new Actuator object with pin number 17
+    button_status = val('b',False)           # Creates a new shared boolean variable with an initial value of False
+    led = LED(LED_ID)
+    servo_status = False
+    LED_Status = "Off\t"
+    
+    # Creates a new process that checks the state of a button and updates the shared variable
+    button_job = proc(
+                target = cont_check_button,
+            args=(BUTTON_ID,button_status)
+        )
+    button_job.start()
 
-        servo.min()
-        
-        # An 'infinite' loop is started
-        while True:
+    servo.min()
+    
+    # An 'infinite' loop is started
+    while True:
 
-            # Starts a nested loop that runs as long as the button is pressed
-            while button_status.value:
-                
-                # Creates two new shared variables with initial values of 0.0 to store average temperature values
-                svalue = val('d',0.0)
-                ivalue = val('d',0.0)
-
-                start = time.perf_counter()      # Records the start time
-
-                jobs = []
-                
-                ROLLING_INTERVAL = 2
-                TOTAL_TIME_INTERVAL = 10
-
-                # Creates a new process that initializes a list of standard temperature values
-                process1 = proc(
-                        target=standardListInit,
-                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,svalue,LED_Status,button_status.value,servo_status)
-                )
-                jobs.append(process1)
-
-                # Creates a new process that initializes a list of injured temperature values
-                process2 = proc(
-                        target=injuredListInit,
-                    args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,ivalue,LED_Status,button_status.value,servo_status)
-                )
-                jobs.append(process2)
-                
-                # Starts each process in the list
-                for j in jobs:
-                    j.start()
+        # Starts a nested loop that runs as long as the button is pressed
+        while button_status.value:
             
-                # Waits for each process in the list to finish before continuing
+            # Creates two new shared variables with initial values of 0.0 to store average temperature values
+            svalue = val('d',0.0)
+            ivalue = val('d',0.0)
 
-                led.blink()
-                LED_Status = "Blinking"
+            start = time.perf_counter()      # Records the start time
 
-                for j in jobs:
-                    j.join()
+            jobs = []
+            
+            ROLLING_INTERVAL = 2
+            TOTAL_TIME_INTERVAL = 10
+
+            # Creates a new process that initializes a list of standard temperature values
+            process1 = proc(
+                    target=standardListInit,
+                args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,svalue,LED_Status,button_status.value,servo_status)
+            )
+            jobs.append(process1)
+
+            # Creates a new process that initializes a list of injured temperature values
+            process2 = proc(
+                    target=injuredListInit,
+                args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,ivalue,LED_Status,button_status.value,servo_status)
+            )
+            jobs.append(process2)
+            
+            # Starts each process in the list
+            for j in jobs:
+                j.start()
+        
+            # Waits for each process in the list to finish before continuing
+
+            led.blink()
+            LED_Status = "Blinking"
+
+            for j in jobs:
+                j.join()
+
+            led.off()
+            LED_Status = "Off\t"
+        
+            # Terminates each process in the list
+            for j in jobs:
+                j.terminate()
+
+            stop = time.perf_counter()         # Records the end time
+
+            print("Standard Avg Temp:", svalue.value)
+            print("Injured Avg Temp:", ivalue.value)
+
+            # Creates a new Parser object
+            parser = Parser()
+
+            sval = round(svalue.value,2)
+            ival = round(ivalue.value,2)
+            
+            # Writes the temperature values to a file using the Parser object
+            parser.write_two_to_file(sval,ival)
+
+            # Activates the servo motor if the standard average temperature is lower than the injured average temperature
+            if svalue.value < ivalue.value:
+                print("Servo activated")
+                servo.max()
+                servo_status = "Compressing"
+                print("Device Sleeping")
+                led.on()
+                LED_Status = "On\t"
+                # Creates new task for constantly printing out the state of the I/O devices
+
+                for x in range(0,COMPRESSION_TIME,PRINT_TIME_SLEEP):
+                    print_styled(LED_Status,button_status.value,servo_status)
+                    time.sleep(PRINT_TIME_SLEEP)
 
                 led.off()
                 LED_Status = "Off\t"
-            
-                # Terminates each process in the list
-                for j in jobs:
-                    j.terminate()
-
-                stop = time.perf_counter()         # Records the end time
-
-                print("Standard Avg Temp:", svalue.value)
-                print("Injured Avg Temp:", ivalue.value)
-
-                # Creates a new Parser object
-                parser = Parser()
-
-                sval = round(svalue.value,2)
-                ival = round(ivalue.value,2)
-                
-                # Writes the temperature values to a file using the Parser object
-                parser.write_two_to_file(sval,ival)
-
-                # Activates the servo motor if the standard average temperature is lower than the injured average temperature
-                if svalue.value < ivalue.value:
-                    print("Servo activated")
-                    servo.max()
-                    servo_status = "Compressing"
-                    print("Device Sleeping")
-                    led.on()
-                    LED_Status = "On\t"
-                    # Creates new task for constantly printing out the state of the I/O devices
-
-                    for x in range(0,COMPRESSION_TIME,PRINT_TIME_SLEEP):
-                        print_styled(LED_Status,button_status.value,servo_status)
-                        time.sleep(PRINT_TIME_SLEEP)
-
-                    led.off()
-                    LED_Status = "Off\t"
-                    print("Device Re-activating")
-                else:
-                    print("Go next")
-                    servo.min()
-                    servo_status = "Not Compressing"
-                    print_styled(LED_Status,button_status.value,servo_status)
-
-
-            # If the button is not pressed, print a message and wait for 3 seconds before checking the button state again
-            while not button_status.value:
-                led.off()
-                LED_Status = "Off"
-                time.sleep(3)
+                print("Device Re-activating")
+            else:
+                print("Go next")
+                servo.min()
+                servo_status = "Not Compressing"
                 print_styled(LED_Status,button_status.value,servo_status)
 
-    # If an exception is caught, exits the program
-    except:
-        sys.exit()
+
+        # If the button is not pressed, print a message and wait for 3 seconds before checking the button state again
+        while not button_status.value:
+            led.off()
+            LED_Status = "Off\t"
+            print_styled(LED_Status,button_status.value,servo_status)
+            time.sleep(3)
+
+# If an exception is caught, exits the program
 
 if __name__ == "__main__":
     try:
