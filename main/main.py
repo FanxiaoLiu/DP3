@@ -227,6 +227,8 @@ def main():
                 args=(ROLLING_INTERVAL,TOTAL_TIME_INTERVAL,ivalue,LED_Status,button_status.value,servo_status)
             )
             jobs.append(process2)
+
+            LED_Status = "Blinking"
             
             # Starts each process in the list
             for j in jobs:
@@ -235,7 +237,6 @@ def main():
             # Waits for each process in the list to finish before continuing
 
             led.blink()
-            LED_Status = "Blinking"
 
             for j in jobs:
                 j.join()
