@@ -1,1 +1,9 @@
+<<<<<<< HEAD
 12:35:11	Standard: 28.39	Injured: 27.69
+=======
+14:14:04	Standard: 27.67	Injured: 0.0
+14:15:18	Standard: 29.44	Injured: 0.0
+14:15:59	Standard: 29.43	Injured: 20.27
+14:16:12	Standard: 29.39	Injured: 39.36
+14:16:37	Standard: 29.68	Injured: 20.14
+>>>>>>> 2d8247af31cd44cb24a4894fa0063f66b18a64b7

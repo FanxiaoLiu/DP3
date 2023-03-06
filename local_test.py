@@ -63,7 +63,7 @@ if __name__ == "__main__":
     jobs.append(process1)
     process2 = proc(
             target=injuredListInit,
-        args=(5,20,ivalue,"Off\t","Off","Not Compressing")
+        args=(5,20,ivalue,"Off\t",0,"Not Compressing")
     )
     jobs.append(process2)
 
